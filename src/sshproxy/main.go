@@ -3,17 +3,20 @@ package main
 import (
 	"fmt"
 	"golang.org/x/crypto/ssh"
-	//	"golang.org/x/crypto/ssh/terminal"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
-	"strconv"
+	"time"
 )
 
 /**
+ * L left/local  -   SshProxy   -    R Right/Remote
+ *
  * LocalSSH  - The listening side of tihs application
  * RemoteSSH - The connection with the server that contains and provides the actual data
  * Client    - The client that connects with this application
+ *
  */
 
 func main() {
@@ -33,6 +36,7 @@ func main() {
 
 func handleLocalSshConn(lnConn net.Conn, lConfig *ssh.ServerConfig) {
 	defer func() {
+		return
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
 		}
@@ -60,72 +64,53 @@ func handleLocalSshConn(lnConn net.Conn, lConfig *ssh.ServerConfig) {
 		if err != nil {
 			panic("Failed to create session: " + err.Error())
 		}
-		defer rChannel.Close()
 
-		go func() {
+		go func(lChannel, rChannel ssh.Channel) {
 			defer func() {
+				return
 				if r := recover(); r != nil {
 					fmt.Println("Recovered in f", r)
 				}
 			}()
+			defer rChannel.Close()
+			defer lChannel.Close()
+
 			for {
 				select {
-				case lRequest := <-lRequests:
-					if string(lRequest.Type) != "subsystem" {
-						fmt.Println("Ignoring unsupported request type: " + string(lRequest.Type))
-						lRequest.Reply(false, nil)
+				case lRequest, ok := <-lRequests:
+					if !ok {
+						return
+					}
+					if err := pipeRequests(lRequest, rChannel); err != nil {
+						fmt.Println("Error: " + err.Error())
 						continue
 					}
-
-					fmt.Println("l type " + string(lRequest.Type))
-					fmt.Println("l wantReply " + strconv.FormatBool(lRequest.WantReply))
-					fmt.Println(string("l payload " + string(lRequest.Payload)))
-					reply, err := rChannel.SendRequest(lRequest.Type, lRequest.WantReply, lRequest.Payload)
-
-					if err != nil {
-						fmt.Println("Error " + err.Error())
+				case rRequest, ok := <-rRequests:
+					if !ok {
+						return
 					}
-					if lRequest.WantReply {
-						lRequest.Reply(reply, nil)
-					}
-				case rRequest := <-rRequests:
-					fmt.Println("type " + string(rRequest.Type))
-					fmt.Println("wantReply " + strconv.FormatBool(rRequest.WantReply))
-					fmt.Println(string("payload " + string(rRequest.Payload)))
-					reply, err := lChannel.SendRequest(rRequest.Type, rRequest.WantReply, rRequest.Payload) // todo: Error checking?
-					if err != nil {
-						fmt.Println("Error " + err.Error())
-					}
-					if rRequest.WantReply {
-						rRequest.Reply(reply, nil)
+					if err := pipeRequests(rRequest, lChannel); err != nil {
+						fmt.Println("Error: " + err.Error())
+						continue
 					}
 				}
 			}
-		}()
+		}(lChannel, rChannel)
 
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					fmt.Println("Recovered in f", r)
-				}
-			}()
+		time.Sleep(50 * time.Millisecond)
+		pipe := func(dst io.Writer, src io.Reader) {
+			bytes, err := io.Copy(dst, src)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 
-			Pipe(rChannel, lChannel)
-			fmt.Println("Done piping")
-		}()
+			fmt.Println("Bytes exchanged: ", bytes)
+			rChannel.CloseWrite()
+			lChannel.CloseWrite()
+		}
 
-		// This somehow works. Supposedly it closes the connection(?)
-		/*		go func() {
-				defer lChannel.Close()
-				term := terminal.NewTerminal(lChannel, "> ")
-				for {
-					line, err := term.ReadLine()
-					if err != nil {
-						break
-					}
-					fmt.Println(line)
-				}
-			}()*/
+		go pipe(rChannel, lChannel)
+		go pipe(lChannel, rChannel)
 	}
 }
 
@@ -152,7 +137,6 @@ func getLocalSshConfig() *ssh.ServerConfig {
 	}
 
 	config.AddHostKey(private)
-
 	return config
 }
 
@@ -172,55 +156,21 @@ func getRemoteSshClient(user string) *ssh.Client {
 	return conn
 }
 
-// chanFromConn creates a channel from a Conn object, and sends everything it
-//  Read()s from the socket to the channel.
-// derived from: http://www.stavros.io/posts/proxying-two-connections-go/
-func chanFromConn(conn ssh.Channel) chan []byte {
-	c := make(chan []byte)
-
-	go func() {
-		b := make([]byte, 1024)
-
-		for {
-			n, err := conn.Read(b)
-			if n > 0 {
-				res := make([]byte, n)
-				// Copy the buffer so it doesn't get changed while read by the recipient.
-				copy(res, b[:n])
-				c <- res
-			}
-			if err != nil {
-				c <- nil
-				break
-			}
-		}
-	}()
-
-	return c
-}
-
-// Pipe creates a full-duplex pipe between the two sockets and transfers data from one to the other.
-// derived from: http://www.stavros.io/posts/proxying-two-connections-go/
-func Pipe(conn1 ssh.Channel, conn2 ssh.Channel) {
-	chan1 := chanFromConn(conn1)
-	chan2 := chanFromConn(conn2)
-
-	for {
-		select {
-		case b1 := <-chan1:
-			fmt.Println(fmt.Sprintf("Len b1: %d", len(b1)))
-			if b1 == nil {
-				return
-			} else {
-				conn2.Write(b1)
-			}
-		case b2 := <-chan2:
-			fmt.Println(fmt.Sprintf("Len b2: %d", len(b2)))
-			if b2 == nil {
-				return
-			} else {
-				conn1.Write(b2)
-			}
-		}
+func pipeRequests(req *ssh.Request, channel ssh.Channel) error {
+	if req == nil {
+		return fmt.Errorf("Req == nil? :/")
 	}
+	if string(req.Type) != "subsystem" && string(req.Type) != "exit-status" {
+		req.Reply(false, nil)
+		return fmt.Errorf("Ignoring unsupported request type: %s", string(req.Type))
+	}
+	reply, err := channel.SendRequest(req.Type, req.WantReply, req.Payload)
+	if err != nil {
+		return err
+	}
+	if req.WantReply {
+		req.Reply(reply, nil)
+	}
+
+	return nil
 }
