@@ -5,8 +5,8 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -20,7 +20,6 @@ import (
  */
 
 func main() {
-	config := getLocalSshConfig()
 	listener, err := net.Listen("tcp", "0.0.0.0:2022")
 	if err != nil {
 		panic("failed to listen for connection")
@@ -30,24 +29,29 @@ func main() {
 		if err != nil {
 			panic("failed to accept incoming connection")
 		}
-		go handleLocalSshConn(lnConn, config)
+		go handleLocalSshConn(lnConn)
 	}
 }
 
-func handleLocalSshConn(lnConn net.Conn, lConfig *ssh.ServerConfig) {
+func handleLocalSshConn(lnConn net.Conn) {
 	defer func() {
 		return
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
 		}
 	}()
+
+	var rClient *ssh.Client
+	lConfig := getLocalSshConfig(&rClient)
 	lConn, lChans, lReqs, err := ssh.NewServerConn(lnConn, lConfig)
+	if rClient == nil {
+		return
+	}
+	defer lConn.Close()
 	if err != nil {
 		panic("failed to handshake")
 	}
 	go ssh.DiscardRequests(lReqs)
-
-	rClient := getRemoteSshClient(lConn.User())
 	defer rClient.Close()
 
 	for newChannel := range lChans {
@@ -114,15 +118,19 @@ func handleLocalSshConn(lnConn net.Conn, lConfig *ssh.ServerConfig) {
 	}
 }
 
-func getLocalSshConfig() *ssh.ServerConfig {
+func getLocalSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 	config := &ssh.ServerConfig{
+		ServerVersion: "SSH-2.0-SshReverseProxy",
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			// Should use constant-time compare (or better, salt+hash) in
-			// a production setting.
-			if c.User() == "dolf" && string(pass) == "dolf" {
+			if c.User() == "dolf" {
+				var err error
+				*rClient, err = getRemoteSshClient("localhost", "2222", c.User(), string(pass))
+				if err != nil {
+					return nil, fmt.Errorf("password rejected for %q: %s", c.User(), err)
+				}
 				return nil, nil
 			}
-			return nil, fmt.Errorf("password rejected for %q", c.User())
+			return nil, fmt.Errorf("Unknown user %q", c.User())
 		},
 	}
 
@@ -140,26 +148,27 @@ func getLocalSshConfig() *ssh.ServerConfig {
 	return config
 }
 
-func getRemoteSshClient(user string) *ssh.Client {
+func getRemoteSshClient(host, portStr, user, password string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
-		User: "dolf",
+		User: user,
 		Auth: []ssh.AuthMethod{
-			ssh.Password("dolf"),
+			ssh.Password(password),
 		},
 	}
-	// Dial your ssh server.
-	conn, err := ssh.Dial("tcp", "localhost:2222", config)
+	port, err := strconv.ParseInt(portStr, 10, 64)
 	if err != nil {
-		log.Fatalf("unable to connect: %s", err)
+		panic("Port must be an integer")
 	}
 
-	return conn
+	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect: " + err.Error())
+	}
+
+	return conn, nil
 }
 
 func pipeRequests(req *ssh.Request, channel ssh.Channel) error {
-	if req == nil {
-		return fmt.Errorf("Req == nil? :/")
-	}
 	if string(req.Type) != "subsystem" && string(req.Type) != "exit-status" {
 		req.Reply(false, nil)
 		return fmt.Errorf("Ignoring unsupported request type: %s", string(req.Type))
