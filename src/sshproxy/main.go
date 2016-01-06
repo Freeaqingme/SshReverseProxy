@@ -35,87 +35,58 @@ func main() {
 
 func handleLocalSshConn(lnConn net.Conn) {
 	defer func() {
-		return
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in f", r)
+			fmt.Println("Recovered from panic: ", r)
 		}
 	}()
 
 	var rClient *ssh.Client
 	lConfig := getLocalSshConfig(&rClient)
 	lConn, lChans, lReqs, err := ssh.NewServerConn(lnConn, lConfig)
-	if rClient == nil {
-		return
+	if err != nil {
+		panic("Handshake failed " + err.Error())
 	}
 	defer lConn.Close()
-	if err != nil {
-		panic("failed to handshake")
-	}
-	go ssh.DiscardRequests(lReqs)
 	defer rClient.Close()
 
+	go ssh.DiscardRequests(lReqs)
+
 	for newChannel := range lChans {
-		if newChannel.ChannelType() != "session" {
-			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type: "+newChannel.ChannelType())
-			continue
-		}
-		lChannel, lRequests, err := newChannel.Accept()
-		if err != nil {
-			panic("could not accept channel.")
-		}
-
-		rChannel, rRequests, err := rClient.OpenChannel(newChannel.ChannelType(), nil)
-		if err != nil {
-			panic("Failed to create session: " + err.Error())
-		}
-
-		go func(lChannel, rChannel ssh.Channel) {
-			defer func() {
-				return
-				if r := recover(); r != nil {
-					fmt.Println("Recovered in f", r)
-				}
-			}()
-			defer rChannel.Close()
-			defer lChannel.Close()
-
-			for {
-				select {
-				case lRequest, ok := <-lRequests:
-					if !ok {
-						return
-					}
-					if err := pipeRequests(lRequest, rChannel); err != nil {
-						fmt.Println("Error: " + err.Error())
-						continue
-					}
-				case rRequest, ok := <-rRequests:
-					if !ok {
-						return
-					}
-					if err := pipeRequests(rRequest, lChannel); err != nil {
-						fmt.Println("Error: " + err.Error())
-						continue
-					}
-				}
-			}
-		}(lChannel, rChannel)
-
-		time.Sleep(50 * time.Millisecond)
-		pipe := func(dst io.Writer, src io.Reader) {
-			bytes, err := io.Copy(dst, src)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-
-			fmt.Println("Bytes exchanged: ", bytes)
-			rChannel.CloseWrite()
-			lChannel.CloseWrite()
-		}
-
-		go pipe(rChannel, lChannel)
-		go pipe(lChannel, rChannel)
+		handleChannel(newChannel, rClient)
 	}
+}
+
+func handleChannel(newChannel ssh.NewChannel, rClient *ssh.Client) {
+	if newChannel.ChannelType() != "session" {
+		newChannel.Reject(ssh.UnknownChannelType, "unknown channel type: "+newChannel.ChannelType())
+		return
+	}
+	lChannel, lRequests, err := newChannel.Accept()
+	if err != nil {
+		panic("could not accept channel.")
+	}
+
+	rChannel, rRequests, err := rClient.OpenChannel(newChannel.ChannelType(), nil)
+	if err != nil {
+		panic("Failed to create session: " + err.Error())
+	}
+
+	go pipeRequests(lChannel, rChannel, lRequests, rRequests)
+
+	time.Sleep(50 * time.Millisecond)
+	pipe := func(dst io.Writer, src io.Reader) {
+		bytes, err := io.Copy(dst, src)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		fmt.Println("Bytes exchanged: ", bytes)
+		rChannel.CloseWrite()
+		lChannel.CloseWrite()
+	}
+
+	go pipe(rChannel, lChannel)
+	go pipe(lChannel, rChannel)
 }
 
 func getLocalSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
@@ -168,7 +139,39 @@ func getRemoteSshClient(host, portStr, user, password string) (*ssh.Client, erro
 	return conn, nil
 }
 
-func pipeRequests(req *ssh.Request, channel ssh.Channel) error {
+func pipeRequests(lChannel, rChannel ssh.Channel, lRequests, rRequests <-chan *ssh.Request) {
+	defer func() {
+		return
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+	}()
+	defer rChannel.Close()
+	defer lChannel.Close()
+
+	for {
+		select {
+		case lRequest, ok := <-lRequests:
+			if !ok {
+				return
+			}
+			if err := forwardRequest(lRequest, rChannel); err != nil {
+				fmt.Println("Error: " + err.Error())
+				continue
+			}
+		case rRequest, ok := <-rRequests:
+			if !ok {
+				return
+			}
+			if err := forwardRequest(rRequest, lChannel); err != nil {
+				fmt.Println("Error: " + err.Error())
+				continue
+			}
+		}
+	}
+}
+
+func forwardRequest(req *ssh.Request, channel ssh.Channel) error {
 	if string(req.Type) != "subsystem" && string(req.Type) != "exit-status" {
 		req.Reply(false, nil)
 		return fmt.Errorf("Ignoring unsupported request type: %s", string(req.Type))
