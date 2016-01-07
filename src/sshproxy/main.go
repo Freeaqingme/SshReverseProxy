@@ -72,21 +72,19 @@ func handleChannel(newChannel ssh.NewChannel, rClient *ssh.Client) {
 	}
 
 	go pipeRequests(lChannel, rChannel, lRequests, rRequests)
-
 	time.Sleep(50 * time.Millisecond)
-	pipe := func(dst io.Writer, src io.Reader) {
-		bytes, err := io.Copy(dst, src)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-
-		fmt.Println("Bytes exchanged: ", bytes)
-		rChannel.CloseWrite()
-		lChannel.CloseWrite()
-	}
-
 	go pipe(rChannel, lChannel)
 	go pipe(lChannel, rChannel)
+}
+
+func pipe(dst, src ssh.Channel) {
+	bytes, err := io.Copy(dst, src)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	fmt.Println("Bytes exchanged: ", bytes)
+	dst.CloseWrite()
 }
 
 func getLocalSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
