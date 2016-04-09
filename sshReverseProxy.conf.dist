@@ -1,0 +1,13 @@
+[ssh-reverse-proxy]
+
+# By default SshReverseProxy will try to recover as much as possible from
+# any kind of error it encounters. However, sometimes it may be
+# desirable to stop execution when a panic() occurs. Setting this to
+# true will ensure the application does not recover but halts execution
+# instead.
+exit-on-panic = false
+
+[file-user-backend]
+enabled = true
+
+path = /etc/sshReverseProxy/usermap.cf

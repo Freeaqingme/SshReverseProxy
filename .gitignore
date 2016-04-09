@@ -1,1 +1,3 @@
 src/golang.org
+src/github.com
+sshReverseProxy.conf
