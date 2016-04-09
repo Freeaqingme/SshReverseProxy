@@ -1,3 +1,10 @@
+// SshReverseProxy - This tag line may change
+//
+// Copyright 2016 Dolf Schimmel, Freeaqingme.
+//
+// This Source Code Form is subject to the terms of the two-clause BSD license.
+// For its contents, please refer to the LICENSE file.
+//
 package main
 
 import (
@@ -11,16 +18,14 @@ import (
 )
 
 /**
- * L left/local  -   SshProxy   -    R Right/Remote
- *
- * LocalSSH  - The listening side of tihs application
- * RemoteSSH - The connection with the server that contains and provides the actual data
- * Client    - The client that connects with this application
- *
+ * Used Terminology
+ *   client (c)    -     proxyServer (ps)     -     server (s)
  */
 
 func main() {
 	listener, err := net.Listen("tcp", "0.0.0.0:2022")
+	fmt.Println("Now listening on :2022")
+
 	if err != nil {
 		panic("failed to listen for connection")
 	}
@@ -40,19 +45,21 @@ func handleLocalSshConn(lnConn net.Conn) {
 		}
 	}()
 
-	var rClient *ssh.Client
-	lConfig := getLocalSshConfig(&rClient)
-	lConn, lChans, lReqs, err := ssh.NewServerConn(lnConn, lConfig)
+	fmt.Println("Received connection")
+
+	var sClient *ssh.Client
+	psConfig := getProxyServerSshConfig(&sClient)
+	psConn, psChans, psReqs, err := ssh.NewServerConn(lnConn, psConfig)
 	if err != nil {
 		panic("Handshake failed " + err.Error())
 	}
-	defer lConn.Close()
-	defer rClient.Close()
+	defer psConn.Close()
+	defer sClient.Close()
 
-	go ssh.DiscardRequests(lReqs)
+	go ssh.DiscardRequests(psReqs)
 
-	for newChannel := range lChans {
-		handleChannel(newChannel, rClient)
+	for newChannel := range psChans {
+		handleChannel(newChannel, sClient)
 	}
 }
 
@@ -61,20 +68,20 @@ func handleChannel(newChannel ssh.NewChannel, rClient *ssh.Client) {
 		newChannel.Reject(ssh.UnknownChannelType, "unknown channel type: "+newChannel.ChannelType())
 		return
 	}
-	lChannel, lRequests, err := newChannel.Accept()
+	psChannel, psRequests, err := newChannel.Accept()
 	if err != nil {
 		panic("could not accept channel.")
 	}
 
-	rChannel, rRequests, err := rClient.OpenChannel(newChannel.ChannelType(), nil)
+	sChannel, sRequests, err := rClient.OpenChannel(newChannel.ChannelType(), nil)
 	if err != nil {
 		panic("Failed to create session: " + err.Error())
 	}
 
-	go pipeRequests(lChannel, rChannel, lRequests, rRequests)
+	go pipeRequests(psChannel, sChannel, psRequests, sRequests)
 	time.Sleep(50 * time.Millisecond)
-	go pipe(rChannel, lChannel)
-	go pipe(lChannel, rChannel)
+	go pipe(sChannel, psChannel)
+	go pipe(psChannel, sChannel)
 }
 
 func pipe(dst, src ssh.Channel) {
@@ -87,13 +94,13 @@ func pipe(dst, src ssh.Channel) {
 	dst.CloseWrite()
 }
 
-func getLocalSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
+func getProxyServerSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 	config := &ssh.ServerConfig{
 		ServerVersion: "SSH-2.0-SshReverseProxy",
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			if c.User() == "dolf" {
 				var err error
-				*rClient, err = getRemoteSshClient("localhost", "2222", c.User(), string(pass))
+				*rClient, err = getServerSshClient("localhost", "2222", c.User(), string(pass))
 				if err != nil {
 					return nil, fmt.Errorf("password rejected for %q: %s", c.User(), err)
 				}
@@ -117,7 +124,7 @@ func getLocalSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 	return config
 }
 
-func getRemoteSshClient(host, portStr, user, password string) (*ssh.Client, error) {
+func getServerSshClient(host, portStr, user, password string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
@@ -137,31 +144,31 @@ func getRemoteSshClient(host, portStr, user, password string) (*ssh.Client, erro
 	return conn, nil
 }
 
-func pipeRequests(lChannel, rChannel ssh.Channel, lRequests, rRequests <-chan *ssh.Request) {
+func pipeRequests(psChannel, sChannel ssh.Channel, psRequests, sRequests <-chan *ssh.Request) {
 	defer func() {
 		return
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
 		}
 	}()
-	defer rChannel.Close()
-	defer lChannel.Close()
+	defer sChannel.Close()
+	defer psChannel.Close()
 
 	for {
 		select {
-		case lRequest, ok := <-lRequests:
+		case lRequest, ok := <-psRequests:
 			if !ok {
 				return
 			}
-			if err := forwardRequest(lRequest, rChannel); err != nil {
+			if err := forwardRequest(lRequest, sChannel); err != nil {
 				fmt.Println("Error: " + err.Error())
 				continue
 			}
-		case rRequest, ok := <-rRequests:
+		case rRequest, ok := <-sRequests:
 			if !ok {
 				return
 			}
-			if err := forwardRequest(rRequest, lChannel); err != nil {
+			if err := forwardRequest(rRequest, psChannel); err != nil {
 				fmt.Println("Error: " + err.Error())
 				continue
 			}
