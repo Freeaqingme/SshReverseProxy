@@ -12,11 +12,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
-	"strconv"
-	"time"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	skel "github.com/Freeaqingme/GoDaemonSkeleton"
 	"golang.org/x/crypto/ssh"
@@ -38,11 +38,11 @@ func init() {
 }
 
 func daemonStart() {
-	if ! Config.File_User_Backend.Enabled {
+	if !Config.File_User_Backend.Enabled {
 		Log.Fatal("No User Backend enabled")
 	}
 
-	err := backend.Init(Config.File_User_Backend.Path)
+	err := backend.Init(Config.File_User_Backend.Path, Config.File_User_Backend.Min_Entries)
 	if err != nil {
 		Log.Fatal("Could not load user map: ", err.Error())
 	}
@@ -51,22 +51,23 @@ func daemonStart() {
 	))
 	go reloadMapsOnSigHup()
 
-	listener, err := net.Listen("tcp", "0.0.0.0:2022")
-	fmt.Println("Now listening on :2022")
+	listener, err := net.Listen("tcp", Config.Ssh_Reverse_Proxy.Listen)
 
 	if err != nil {
-		panic("failed to listen for connection")
+		Log.Fatal("Failed to listen on", Config.Ssh_Reverse_Proxy.Listen)
 	}
+	Log.Info("Now listening on", Config.Ssh_Reverse_Proxy.Listen)
+
 	for {
 		lnConn, err := listener.Accept()
 		if err != nil {
-			panic("failed to accept incoming connection")
+			Log.Fatal("Failed to accept incoming connection")
 		}
 		go handleLocalSshConn(lnConn)
 	}
 }
 
-func reloadMapsOnSigHup(){
+func reloadMapsOnSigHup() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
 
@@ -83,18 +84,23 @@ func reloadMapsOnSigHup(){
 
 func handleLocalSshConn(lnConn net.Conn) {
 	defer func() {
+		if Config.Ssh_Reverse_Proxy.Exit_On_Panic {
+			return
+		}
 		if r := recover(); r != nil {
-			fmt.Println("Recovered from panic: ", r)
+			Log.Error("Recovered from panic in connection from "+
+				lnConn.RemoteAddr().String()+":", r)
 		}
 	}()
 
-	fmt.Println("Received connection")
+	Log.Info("Received connection from", lnConn.RemoteAddr())
 
 	var sClient *ssh.Client
 	psConfig := getProxyServerSshConfig(&sClient)
 	psConn, psChans, psReqs, err := ssh.NewServerConn(lnConn, psConfig)
 	if err != nil {
-		panic("Handshake failed " + err.Error())
+		Log.Info("Could not establish connection with " + lnConn.RemoteAddr().String() + ": " + err.Error())
+		return
 	}
 	defer psConn.Close()
 	defer sClient.Close()
@@ -104,6 +110,8 @@ func handleLocalSshConn(lnConn net.Conn) {
 	for newChannel := range psChans {
 		handleChannel(newChannel, sClient)
 	}
+
+	Log.Info("Lost connection with", lnConn.RemoteAddr())
 }
 
 func handleChannel(newChannel ssh.NewChannel, rClient *ssh.Client) {
@@ -128,12 +136,11 @@ func handleChannel(newChannel ssh.NewChannel, rClient *ssh.Client) {
 }
 
 func pipe(dst, src ssh.Channel) {
-	bytes, err := io.Copy(dst, src)
+	_, err := io.Copy(dst, src)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	fmt.Println("Bytes exchanged: ", bytes)
 	dst.CloseWrite()
 }
 
@@ -144,19 +151,23 @@ func getProxyServerSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 			var err error
 			*rClient, err = getServerSshClient(host, port, c.User(), string(pass))
 			if err != nil {
-				return nil, fmt.Errorf("password rejected for %q: %s", c.User(), err)
+				Log.Info(fmt.Sprintf("Could not authorize %q on %s: %s",
+					c.User(), c.RemoteAddr().String(), err))
+				return nil, fmt.Errorf("Could not authorize %q on %s: %s",
+					c.User(), c.RemoteAddr().String(), err)
 			}
 			return nil, nil
 		}
-		return nil, fmt.Errorf("Unknown user %q", c.User())
+		Log.Info(fmt.Sprintf("Unknown user %q on %s", c.User(), c.RemoteAddr().String()))
+		return nil, fmt.Errorf("Unknown user %q on %s", c.User(), c.RemoteAddr().String())
 	}
 
 	config := &ssh.ServerConfig{
-		ServerVersion: "SSH-2.0-SshReverseProxy",
+		ServerVersion:    "SSH-2.0-SshReverseProxy",
 		PasswordCallback: callback,
 	}
 
-	privateBytes, err := ioutil.ReadFile("id_rsa")
+	privateBytes, err := ioutil.ReadFile(Config.Ssh_Reverse_Proxy.Key_File)
 	if err != nil {
 		panic("Failed to load private key")
 	}
@@ -225,6 +236,11 @@ func pipeRequests(psChannel, sChannel ssh.Channel, psRequests, sRequests <-chan 
 func forwardRequest(req *ssh.Request, channel ssh.Channel) error {
 	if string(req.Type) != "subsystem" && string(req.Type) != "exit-status" {
 		req.Reply(false, nil)
+
+		if req.Type == "env" {
+			return nil
+		}
+
 		return fmt.Errorf("Ignoring unsupported request type: %s", string(req.Type))
 	}
 	reply, err := channel.SendRequest(req.Type, req.WantReply, req.Payload)

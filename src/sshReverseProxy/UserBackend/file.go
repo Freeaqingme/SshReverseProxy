@@ -18,9 +18,11 @@ var fileMapPath string
 
 var fileMap map[string]string
 var fileMapLock sync.RWMutex
+var minEntries int
 
-func Init(path string) error {
+func Init(path string, entriesRequired int) error {
 	fileMapPath = path
+	minEntries = entriesRequired
 
 	return LoadMap()
 }
@@ -47,6 +49,11 @@ func LoadMap() error {
 		}
 
 		newMap[user] = host
+	}
+
+	if len(newMap) < minEntries {
+		return fmt.Errorf("New Map only contains %d entries, which is less than the set minimum %d",
+			len(newMap), minEntries)
 	}
 
 	fileMapLock.Lock()
