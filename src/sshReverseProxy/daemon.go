@@ -21,6 +21,7 @@ import (
 	skel "github.com/Freeaqingme/GoDaemonSkeleton"
 	"golang.org/x/crypto/ssh"
 	backend "sshReverseProxy/UserBackend"
+	"github.com/Freeaqingme/GoDaemonSkeleton/log"
 )
 
 /**
@@ -72,6 +73,9 @@ func reloadMapsOnSigHup() {
 	signal.Notify(c, syscall.SIGHUP)
 
 	for _ = range c {
+		Log.Info("Received SIGHUP")
+		log.Reopen("")
+
 		if err := backend.LoadMap(); err != nil {
 			Log.Error("Could not reload user map:", err.Error())
 		} else {
