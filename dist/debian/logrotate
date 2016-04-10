@@ -1,0 +1,14 @@
+/var/log/sshReverseProxy.log
+{
+	rotate 7
+	missingok
+	notifempty
+	compress
+	delaycompress
+
+	create 0644 root root
+	sharedscripts
+	postrotate
+		/bin/systemctl kill -s HUP sshReverseProxy.service
+	endscript
+}
