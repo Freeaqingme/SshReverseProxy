@@ -17,7 +17,7 @@ set -e
 # the debian-policy package
 
 # Stop sshReverseProxy if it's running
-systemctl stop sshReverseProxy || true
+systemctl stop sshreverseproxy || true
 
 case "$1" in
     remove|upgrade|deconfigure)

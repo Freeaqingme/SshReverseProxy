@@ -1,4 +1,4 @@
-/var/log/sshReverseProxy.log
+/var/log/sshreverseproxy.log
 {
 	rotate 7
 	missingok
@@ -9,6 +9,6 @@
 	create 0644 root root
 	sharedscripts
 	postrotate
-		/bin/systemctl kill -s HUP sshReverseProxy.service
+		/bin/systemctl kill -s HUP sshreverseproxy.service
 	endscript
 }

@@ -45,19 +45,19 @@ clean:
 deb: release
 	rm -rf pkg_root/
 	mkdir -p pkg_root/lib/systemd/system/
-	cp dist/sshReverseProxy.service pkg_root/lib/systemd/system/sshReverseProxy.service
+	cp dist/sshreverseproxy.service pkg_root/lib/systemd/system/sshreverseproxy.service
 	mkdir -p pkg_root/etc/default
-	cp dist/debian/defaults pkg_root/etc/default/sshReverseProxy
+	cp dist/debian/defaults pkg_root/etc/default/sshreverseproxy
 	mkdir -p pkg_root/usr/bin/
-	cp bin/sshReverseProxy pkg_root/usr/bin/sshReverseProxy
-	mkdir -p pkg_root/usr/share/doc/sshReverseProxy
-	cp LICENSE pkg_root/usr/share/doc/sshReverseProxy/
-	mkdir -p pkg_root/etc/sshReverseProxy
-	cp sshReverseProxy.conf.dist pkg_root/etc/sshReverseProxy/sshReverseProxy.conf
+	cp bin/sshreverseproxy pkg_root/usr/bin/sshreverseproxy
+	mkdir -p pkg_root/usr/share/doc/sshreverseproxy
+	cp LICENSE pkg_root/usr/share/doc/sshreverseproxy/
+	mkdir -p pkg_root/etc/sshreverseproxy
+	cp sshreverseproxy.conf.dist pkg_root/etc/sshreverseproxy/sshreverseproxy.conf
 	mkdir -p pkg_root/etc/logrotate.d
-	cp dist/debian/logrotate pkg_root/etc/logrotate.d/sshReverseProxy
+	cp dist/debian/logrotate pkg_root/etc/logrotate.d/sshreverseproxy
 	fpm \
-		-n sshReverseProxy \
+		-n sshreverseproxy \
 		-C pkg_root \
 		-s dir \
 		-t deb \
@@ -66,14 +66,12 @@ deb: release
 		--deb-compression bzip2 \
 		--after-install dist/debian/postinst \
 		--before-remove dist/debian/prerm \
-		--depends libspf2-2 \
-		--depends libmilter1.0.1 \
 		--license BSD-2-clause \
 		-m "Dolf Schimmel <dolf@transip.nl>" \
 		--url "https://github.com/Freeaqingme/sshReverseProxy" \
 		--vendor "github.com/Freeaqingme" \
 		--description "A layer-7 reverse proxy for the SSH/SFTP protocol." \
 		--category network \
-		--config-files /etc/sshReverseProxy/sshReverseProxy.conf \
-		--directories /var/run/sshReverseProxy \
+		--config-files /etc/sshreverseproxy/sshreverseproxy.conf \
+		--directories /var/run/sshreverseproxy \
 		.

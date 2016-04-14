@@ -11,7 +11,7 @@ exit-on-panic = false
 listen = "0.0.0.0:2222"
 
 # The key file to use
-key-file = "/etc/sshReverseProxy/id_rsa"
+key-file = "/etc/sshReverseproxy/id_rsa"
 
 [file-user-backend]
 enabled = true
@@ -19,7 +19,7 @@ enabled = true
 # The path to use for the user bckend. Expects a format in the form of:
 # username1 host:port\n
 # username2 host:port\n
-path = /etc/sshReverseProxy/usermap.cf
+path = /etc/sshreverseproxy/usermap.cf
 
 # Do not load a new map if this number of entries is not reached.
 min-entries = 1000

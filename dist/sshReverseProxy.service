@@ -5,6 +5,6 @@ After=nss-lookup.target
 [Service]
 Restart=always
 RestartSec=30
-EnvironmentFile=/etc/default/sshReverseProxy
-ExecStartPre=-/bin/mkdir -p /var/run/sshReverseProxy/
-ExecStart=/usr/bin/sshReverseProxy --config /etc/sshReverseProxy/sshReverseProxy.conf --loglevel $LOGLEVEL daemon
+EnvironmentFile=/etc/default/sshreverseproxy
+ExecStartPre=-/bin/mkdir -p /var/run/sshreverseproxy/
+ExecStart=/usr/bin/sshreverseproxy --config /etc/sshreverseproxy/sshreverseproxy.conf --loglevel $LOGLEVEL daemon

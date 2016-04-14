@@ -24,7 +24,7 @@ var (
 var (
 	buildTag          string
 	buildTime         string
-	defaultConfigFile = "/etc/sshReverseProxy/sshReverseProxy.conf"
+	defaultConfigFile = "/etc/sshReverseProxy/sshreverseproxy.conf"
 )
 
 func main() {
