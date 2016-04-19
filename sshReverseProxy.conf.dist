@@ -11,7 +11,7 @@ exit-on-panic = false
 listen = "0.0.0.0:2222"
 
 # The key file to use
-key-file = "/etc/sshReverseproxy/id_rsa"
+key-file = "/etc/sshreverseproxy/id_rsa"
 
 [file-user-backend]
 enabled = true
