@@ -45,15 +45,15 @@ clean:
 deb: release
 	rm -rf pkg_root/
 	mkdir -p pkg_root/lib/systemd/system/
-	cp dist/sshreverseproxy.service pkg_root/lib/systemd/system/sshreverseproxy.service
+	cp dist/sshReverseProxy.service pkg_root/lib/systemd/system/sshreverseproxy.service
 	mkdir -p pkg_root/etc/default
 	cp dist/debian/defaults pkg_root/etc/default/sshreverseproxy
 	mkdir -p pkg_root/usr/bin/
-	cp bin/sshreverseproxy pkg_root/usr/bin/sshreverseproxy
+	cp bin/sshReverseProxy pkg_root/usr/bin/sshreverseproxy
 	mkdir -p pkg_root/usr/share/doc/sshreverseproxy
 	cp LICENSE pkg_root/usr/share/doc/sshreverseproxy/
 	mkdir -p pkg_root/etc/sshreverseproxy
-	cp sshreverseproxy.conf.dist pkg_root/etc/sshreverseproxy/sshreverseproxy.conf
+	cp sshReverseProxy.conf.dist pkg_root/etc/sshreverseproxy/sshreverseproxy.conf
 	mkdir -p pkg_root/etc/logrotate.d
 	cp dist/debian/logrotate pkg_root/etc/logrotate.d/sshreverseproxy
 	fpm \
