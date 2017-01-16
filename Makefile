@@ -61,7 +61,7 @@ deb: release
 		-C pkg_root \
 		-s dir \
 		-t deb \
-		-v $(VERSION) \
+		-v "$(VERSION)" \
 		--force \
 		--deb-compression bzip2 \
 		--after-install dist/debian/postinst \

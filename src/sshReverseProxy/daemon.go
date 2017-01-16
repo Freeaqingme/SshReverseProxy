@@ -74,7 +74,7 @@ func reloadMapsOnSigHup() {
 
 	for _ = range c {
 		Log.Info("Received SIGHUP")
-		log.Reopen("")
+		log.Reopen()
 
 		if err := backend.LoadMap(); err != nil {
 			Log.Error("Could not reload user map:", err.Error())

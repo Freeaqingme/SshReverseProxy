@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"log/syslog"
 
 	skel "github.com/Freeaqingme/GoDaemonSkeleton"
 	"github.com/Freeaqingme/GoDaemonSkeleton/log"
@@ -41,7 +42,7 @@ func main() {
 		"Log Level. One of: CRITICAL, ERROR, WARNING, NOTICE, INFO, DEBUG)")
 	flag.Parse()
 
-	Log = log.Open("sshReverseProxy", *logLevel)
+	Log = log.Open("sshReverseProxy", *logLevel, syslog.LOG_LOCAL4)
 
 	DefaultConfig(&Config)
 	if *configFile != "" {
