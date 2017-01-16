@@ -1,4 +1,4 @@
 github.com/Freeaqingme/GoDaemonSkeleton 034b51467965ef83f5fb8af5399f1e90a461e26a
 github.com/op/go-logging 970db520ece77730c7e4724c61121037378659d9
 github.com/scalingdata/gcfg 37aabad69cfd3d20b8390d902a8b10e245c615ff
-golang.org/x/crypto 552e9d568fde9701ea1944fb01c8aadaceaa7353
+golang.org/x/crypto abc5fa7ad02123a41f02bf1391c9760f7586e608
