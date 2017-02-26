@@ -8,3 +8,4 @@ RestartSec=30
 EnvironmentFile=/etc/default/sshreverseproxy
 ExecStartPre=-/bin/mkdir -p /var/run/sshreverseproxy/
 ExecStart=/usr/bin/sshreverseproxy --config /etc/sshreverseproxy/sshreverseproxy.conf --loglevel $LOGLEVEL daemon
+LimitNOFILE=65635
