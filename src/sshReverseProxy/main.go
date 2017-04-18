@@ -9,8 +9,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"log/syslog"
+	"os"
 
 	skel "github.com/Freeaqingme/GoDaemonSkeleton"
 	"github.com/Freeaqingme/GoDaemonSkeleton/log"

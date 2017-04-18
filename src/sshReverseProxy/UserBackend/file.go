@@ -6,12 +6,12 @@
 // For its contents, please refer to the LICENSE file.
 package UserBackend
 
-import(
-	"io/ioutil"
+import (
 	"bytes"
 	"fmt"
-	"sync"
+	"io/ioutil"
 	"strings"
+	"sync"
 )
 
 var fileMapPath string
