@@ -187,7 +187,8 @@ func getProxyServerSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 
 func getServerSshClient(host, portStr, user, password string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
-		User: user,
+		User:            user,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},

@@ -14,6 +14,7 @@ export GOARCH ?= amd64
 .PHONY: default
 default: all
 
+# find src/ -name .git -type d | sed -s 's/.git$//' | while read line; do echo -n "${line} " | sed 's/^src\///'; git -C $line rev-parse HEAD; done | sort > GLOCKFILE
 .PHONY: deps
 deps:
 	go get -tags '$(BUILDTAGS)' -d -v sshReverseProxy/...
