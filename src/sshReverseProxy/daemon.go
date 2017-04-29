@@ -39,11 +39,16 @@ func init() {
 }
 
 func daemonStart() {
+	_, err := time.ParseDuration(Config.Ssh_Reverse_Proxy.Auth_Error_Delay)
+	if err != nil {
+		Log.Fatal("Cannot parse 'auth-error-delay': ", err.Error())
+	}
+
 	if !Config.File_User_Backend.Enabled {
 		Log.Fatal("No User Backend enabled")
 	}
 
-	err := backend.Init(Config.File_User_Backend.Path, Config.File_User_Backend.Min_Entries)
+	err = backend.Init(Config.File_User_Backend.Path, Config.File_User_Backend.Min_Entries)
 	if err != nil {
 		Log.Fatal("Could not load user map: ", err.Error())
 	}
@@ -149,6 +154,11 @@ func pipe(dst, src ssh.Channel) {
 }
 
 func getProxyServerSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
+	holdOff := func() {
+		duration, _ := time.ParseDuration(Config.Ssh_Reverse_Proxy.Auth_Error_Delay)
+		time.Sleep(duration)
+	}
+
 	callback := func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 		host, port := backend.GetServerForUser(c.User())
 		if host != "" {
@@ -157,12 +167,14 @@ func getProxyServerSshConfig(rClient **ssh.Client) *ssh.ServerConfig {
 			if err != nil {
 				Log.Info(fmt.Sprintf("Could not authorize %q on %s: %s",
 					c.User(), c.RemoteAddr().String(), err))
+				holdOff()
 				return nil, fmt.Errorf("Could not authorize %q on %s: %s",
 					c.User(), c.RemoteAddr().String(), err)
 			}
 			return nil, nil
 		}
 		Log.Info(fmt.Sprintf("Unknown user %q on %s", c.User(), c.RemoteAddr().String()))
+		holdOff()
 		return nil, fmt.Errorf("Unknown user %q on %s", c.User(), c.RemoteAddr().String())
 	}
 

@@ -13,9 +13,10 @@ import (
 
 type config struct {
 	Ssh_Reverse_Proxy struct {
-		Exit_On_Panic bool
-		Listen        string
-		Key_File      string
+		Exit_On_Panic    bool
+		Listen           string
+		Key_File         string
+		Auth_Error_Delay string
 	}
 	File_User_Backend struct {
 		Enabled     bool
@@ -34,5 +35,6 @@ func LoadConfig(cfgFile string, cfg *config) {
 
 func DefaultConfig(cfg *config) {
 	cfg.Ssh_Reverse_Proxy.Listen = "0.0.0.0:2222"
+	cfg.Ssh_Reverse_Proxy.Auth_Error_Delay = "5s"
 	cfg.Ssh_Reverse_Proxy.Key_File = "/etc/sshReverseProxy/id_rsa"
 }

@@ -13,6 +13,9 @@ listen = "0.0.0.0:2222"
 # The key file to use
 key-file = "/etc/sshreverseproxy/id_rsa"
 
+# Delay a response if there's an authentication error, holds off bots a bit
+auth-error-delay = "5s"
+
 [file-user-backend]
 enabled = true
 
