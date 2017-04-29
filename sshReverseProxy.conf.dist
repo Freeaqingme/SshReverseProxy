@@ -16,6 +16,10 @@ key-file = "/etc/sshreverseproxy/id_rsa"
 # Delay a response if there's an authentication error, holds off bots a bit
 auth-error-delay = "5s"
 
+# For use with tools like fail2ban, file is parsed whenever it's updated.
+# Can only contain a list of ip addresses, no CIDR notation supported.
+# blacklist = "/etc/sshreverseproxy/blacklist"
+
 [file-user-backend]
 enabled = true
 

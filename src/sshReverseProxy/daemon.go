@@ -37,6 +37,11 @@ func init() {
 
 func daemonStart() {
 	backend.SetLogger(Log)
+	if Config.Ssh_Reverse_Proxy.Blacklist != "" {
+		if err := startBlacklist(Config.Ssh_Reverse_Proxy.Blacklist); err != nil {
+			Log.Fatal("Could not parse blacklist: ", err.Error())
+		}
+	}
 	_, err := time.ParseDuration(Config.Ssh_Reverse_Proxy.Auth_Error_Delay)
 	if err != nil {
 		Log.Fatal("Cannot parse 'auth-error-delay': ", err.Error())
@@ -67,7 +72,13 @@ func daemonStart() {
 		if err != nil {
 			Log.Fatal("Failed to accept incoming connection")
 		}
-		go handleLocalSshConn(lnConn)
+		go func(lnConn net.Conn) {
+			if isIpBlacklisted(lnConn.RemoteAddr()) {
+				handleBlacklistedConn(lnConn)
+				return
+			}
+			handleLocalSshConn(lnConn)
+		}(lnConn)
 	}
 }
 

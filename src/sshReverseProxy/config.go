@@ -17,6 +17,7 @@ type config struct {
 		Listen           string
 		Key_File         string
 		Auth_Error_Delay string
+		Blacklist        string
 	}
 	File_User_Backend struct {
 		Enabled     bool
