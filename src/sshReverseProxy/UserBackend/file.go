@@ -12,6 +12,8 @@ import (
 	"io/ioutil"
 	"strings"
 	"sync"
+
+	"github.com/Freeaqingme/GoDaemonSkeleton/log"
 )
 
 var fileMapPath string
@@ -19,6 +21,7 @@ var fileMapPath string
 var fileMap map[string]string
 var fileMapLock sync.RWMutex
 var minEntries int
+var Log *log.Logger
 
 func Init(path string, entriesRequired int) error {
 	fileMapPath = path
@@ -45,7 +48,7 @@ func LoadMap() error {
 		host := string(lineParts[len(lineParts)-1:][0])
 
 		if _, alreadyExists := newMap[user]; alreadyExists {
-			return fmt.Errorf("User %s was defined more than once on line %d", user, i)
+			Log.Noticef("User %s was redefined on line %d", user, i+1)
 		}
 
 		newMap[user] = host
@@ -83,4 +86,8 @@ func GetMapSize() int {
 	defer fileMapLock.RUnlock()
 
 	return len(fileMap)
+}
+
+func SetLogger(logger *log.Logger) {
+	Log = logger
 }
