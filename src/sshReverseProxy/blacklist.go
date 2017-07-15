@@ -133,6 +133,10 @@ func parseBlacklistFile(filename string) (map[string]struct{}, error) {
 }
 
 func isIpBlacklisted(addr net.Addr) bool {
+	if Blacklist == nil {
+		return false
+	}
+
 	Blacklist.RLock()
 	defer Blacklist.RUnlock()
 
