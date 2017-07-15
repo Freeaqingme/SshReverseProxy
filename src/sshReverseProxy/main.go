@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
+	"runtime"
 
 	skel "github.com/Freeaqingme/GoDaemonSkeleton"
 	"github.com/Freeaqingme/GoDaemonSkeleton/log"
@@ -59,11 +60,16 @@ func init() {
 			"SshReverseProxy - This tag line may change - %s\n\n"+
 				"%s\nCopyright (c) 2016, Dolf Schimmel\n"+
 				"License BSD-2 clause <%s>\n\n"+
-				"Time of Build: %s\n\n",
+				"Time of Build: %s\n"+
+				"Go Version: %s %s/%s\n\n",
 			buildTag,
 			"https://github.com/Freeaqingme/SshReverseProxy",
 			"https://git.io/vVSYI",
-			buildTime)
+			buildTime,
+			runtime.Version(),
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
 		os.Exit(0)
 	}
 
