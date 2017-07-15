@@ -101,7 +101,7 @@ pkg_archive: pkg_root
 		-t $(type) \
 		-v "$(VERSION)" \
 		--force \
-		--freebsd-arch freebsd:10:x86:64 \
+		--freebsd-origin freebsd:10:x86:64 \
 		--deb-compression bzip2 \
 		--after-install dist/$(distdir)/postinst \
 		--before-remove dist/$(distdir)/prerm \
